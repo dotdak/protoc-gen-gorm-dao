@@ -1,0 +1,13 @@
+version: v1
+managed:
+  enabled: true
+  optimize_for: CODE_SIZE
+  go_package_prefix:
+    default: github.com/dotdak/protoc-gen-gorm-dao/example
+plugins:
+  - name: go
+    out: proto_go
+    opt: paths=source_relative
+  - name: gorm-dao
+    out: proto_go
+    opt: paths=source_relative

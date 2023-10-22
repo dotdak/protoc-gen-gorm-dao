@@ -1,0 +1,11 @@
+syntax="proto3";
+
+package example;
+
+service ExampleService {
+  rpc Get(GetRequest) returns (GetResponse) {
+  }
+}
+
+message GetRequest {}
+message GetResponse {}
