@@ -22,14 +22,17 @@ func main() {
 		}
 		return importPath
 	}
+
 	protogen.Options{
 		ParamFunc:         flags.Set,
 		ImportRewriteFunc: importRewriteFunc,
 	}.Run(func(p *protogen.Plugin) error {
+
 		for _, f := range p.Files {
-			if !f.Generate {
+			if !f.Generate || f.GoPackageName == "gorm" {
 				continue
 			}
+
 			_ = internal.GenerateFile(p, f)
 		}
 		return nil

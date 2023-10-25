@@ -1,6 +1,6 @@
 syntax="proto3";
 
-package example;
+package example_proto;
 
 service ExampleService {
   rpc Get(GetRequest) returns (GetResponse) {

@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package gorm;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.MessageOptions {
+  GormOptions opts = 2025;
+}
+
+message GormOptions {
+  bool orm = 1;
+}
+
+extend google.protobuf.FieldOptions {
+  GormType type = 2026;
+}
+
+message GormType {
+  oneof type {
+    bool primary = 1;
+    bool auto_increment = 2;
+    bool index = 3;
+    bool not_null = 4;
+    bool unique_index = 5;
+  }
+}

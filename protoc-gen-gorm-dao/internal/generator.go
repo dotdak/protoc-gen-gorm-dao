@@ -2,26 +2,27 @@ package internal
 
 import (
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"unicode"
-	"unicode/utf8"
 
+	"github.com/dotdak/protoc-gen-gorm-dao/proto_go/example_proto/gorm"
 	"google.golang.org/protobuf/compiler/protogen"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 func GenerateFile(plugin *protogen.Plugin, file *protogen.File) *protogen.GeneratedFile {
 	filename := file.GeneratedFilenamePrefix + ".dao.go"
 	g := plugin.NewGeneratedFile(filename, file.GoImportPath)
+
 	genGeneratedHeader(plugin, g, file)
 
 	g.P("package ", file.GoPackageName)
 	g.P()
 
-	for i, imps := 0, file.Desc.Imports(); i < imps.Len(); i++ {
-		genImport(plugin, g, file, imps.Get(i))
+	genImportBase(g)
+	g.P()
+
+	for _, m := range file.Messages {
+		genMessage(g, file, m)
 	}
 
 	return g
@@ -38,82 +39,158 @@ func genGeneratedHeader(gen *protogen.Plugin, g *protogen.GeneratedFile, f *prot
 	g.P()
 }
 
-func genImport(gen *protogen.Plugin, g *protogen.GeneratedFile, f *protogen.File, imp protoreflect.FileImport) {
-	impFile, ok := gen.FilesByPath[imp.Path()]
-	if !ok {
+func genImportBase(g *protogen.GeneratedFile) {
+	g.P("import (")
+	g.P("\"gorm.io/gorm\"")
+	g.P("\"time\"")
+	g.P(")")
+}
+
+func genMessage(g *protogen.GeneratedFile, f *protogen.File, m *protogen.Message) {
+	if m.Desc.IsMapEntry() {
 		return
 	}
-	if impFile.GoImportPath == f.GoImportPath {
-		// Don't generate imports or aliases for types in the same Go package.
+	structName := g.QualifiedGoIdent(m.GoIdent) + "Dao"
+	// Message type declaration.
+	g.P("type ", structName, " struct {")
+	genMessageFields(g, f, m)
+	g.P()
+	g.P("CreatedAt time.Time")
+	g.P("UpdatedAt time.Time")
+	g.P("DeletedAt gorm.DeletedAt ")
+	g.P("}")
+	g.P()
+
+	g.P("func (d *", structName, ") TableName() string {")
+	g.P("return \"", structName, "s\"")
+	g.P("}")
+
+	g.P("func (d *", structName, ") ToProto() *", m.GoIdent, " {")
+	g.P("return &", m.GoIdent, "{")
+	for _, field := range m.Fields {
+		g.P(field.GoName, ": ", "d.", field.GoName, ",")
+	}
+	g.P("}")
+	g.P("}")
+
+	g.P("func (d *", structName, ") FromProto(v *", m.GoIdent, ") *", structName, " {")
+	g.P("*d = ", structName, "{")
+	for _, field := range m.Fields {
+		g.P(field.GoName, ": ", "v.", field.GoName, ",")
+	}
+	g.P("}")
+	g.P("return d")
+	g.P("}")
+}
+
+func genMessageFields(g *protogen.GeneratedFile, f *protogen.File, m *protogen.Message) {
+	if opt, ok := proto.GetExtension(m.Desc.Options(), gorm.E_Opts).(*gorm.GormOptions); !ok || opt == nil || !opt.Orm {
 		return
 	}
-	// Generate imports for all non-weak dependencies, even if they are not
-	// referenced, because other code and tools depend on having the
-	// full transitive closure of protocol buffer types in the binary.
-	if !imp.IsWeak {
-		g.Import(impFile.GoImportPath)
+	for _, field := range m.Fields {
+		genMessageField(g, f, m, field)
 	}
-	if !imp.IsPublic {
+}
+
+func genMessageField(g *protogen.GeneratedFile, f *protogen.File, m *protogen.Message, field *protogen.Field) {
+	if oneof := field.Oneof; oneof != nil && !oneof.Desc.IsSynthetic() {
+		// TODO: support oneof
+		return
+	}
+	if field.Desc.IsMap() {
+		// TODO: support map
 		return
 	}
 
-	// Generate public imports by generating the imported file, parsing it,
-	// and extracting every symbol that should receive a forwarding declaration.
-	impGen := GenerateFile(gen, impFile)
-	impGen.Skip()
-	b, err := impGen.Content()
-	if err != nil {
-		gen.Error(err)
-		return
+	goType, pointer := fieldGoType(g, f, field)
+	if pointer {
+		goType = "*" + goType
 	}
-	fset := token.NewFileSet()
-	astFile, err := parser.ParseFile(fset, "", b, parser.ParseComments)
-	if err != nil {
-		gen.Error(err)
-		return
+
+	name := field.GoName
+	if field.Desc.IsWeak() {
+		name = "XXX_weak_" + name
 	}
-	genForward := func(tok token.Token, name string, expr ast.Expr) {
-		// Don't import unexported symbols.
-		r, _ := utf8.DecodeRuneInString(name)
-		if !unicode.IsUpper(r) {
-			return
-		}
-		// Don't import the FileDescriptor.
-		if name == impFile.GoDescriptorIdent.GoName {
-			return
-		}
-		// Don't import decls referencing a symbol defined in another package.
-		// i.e., don't import decls which are themselves public imports:
-		//
-		//	type T = somepackage.T
-		if _, ok := expr.(*ast.SelectorExpr); ok {
-			return
-		}
-		g.P(tok, " ", name, " = ", impFile.GoImportPath.Ident(name))
+
+	tags := structTags{
+		{"json", fieldJSONTagValue(field)},
 	}
-	g.P("// Symbols defined in public import of ", imp.Path(), ".")
-	g.P()
-	for _, decl := range astFile.Decls {
-		switch decl := decl.(type) {
-		case *ast.GenDecl:
-			for _, spec := range decl.Specs {
-				switch spec := spec.(type) {
-				case *ast.TypeSpec:
-					genForward(decl.Tok, spec.Name.Name, spec.Type)
-				case *ast.ValueSpec:
-					for i, name := range spec.Names {
-						var expr ast.Expr
-						if i < len(spec.Values) {
-							expr = spec.Values[i]
-						}
-						genForward(decl.Tok, name.Name, expr)
-					}
-				case *ast.ImportSpec:
-				default:
-					panic(fmt.Sprintf("can't generate forward for spec type %T", spec))
-				}
-			}
-		}
+
+	g.AnnotateSymbol(m.GoIdent.GoName+"."+name, protogen.Annotation{Location: field.Location})
+	t, ok := proto.GetExtension(field.Desc.Options(), gorm.E_Type).(*gorm.GormType)
+	if ok && t != nil {
+		tags = append(tags, fieldGormTagValue(t)...)
 	}
-	g.P()
+
+	g.P(name, " ", goType, tags)
+}
+
+func fieldGormTagValue(t *gorm.GormType) structTags {
+	switch t.Type.(type) {
+	case *gorm.GormType_Index:
+		return structTags{{"gorm", "index"}}
+	case *gorm.GormType_AutoIncrement:
+		return structTags{{"gorm", "autoIncrement"}}
+
+	case *gorm.GormType_NotNull:
+		return structTags{{"gorm", "not null"}}
+
+	case *gorm.GormType_Primary:
+		return structTags{{"gorm", "primaryKey"}}
+
+	case *gorm.GormType_UniqueIndex:
+		return structTags{{"gorm", "uniqueIndex"}}
+	default:
+		return structTags{}
+	}
+}
+
+func fieldJSONTagValue(field *protogen.Field) string {
+	return string(field.Desc.Name()) + ",omitempty"
+}
+
+// // fieldGoType returns the Go type used for a field.
+// //
+// // If it returns pointer=true, the struct field is a pointer to the type.
+func fieldGoType(g *protogen.GeneratedFile, f *protogen.File, field *protogen.Field) (goType string, pointer bool) {
+	if field.Desc.IsWeak() {
+		return "struct{}", false
+	}
+
+	pointer = field.Desc.HasPresence()
+	switch field.Desc.Kind() {
+	case protoreflect.BoolKind:
+		goType = "bool"
+	case protoreflect.EnumKind:
+		goType = g.QualifiedGoIdent(field.Enum.GoIdent)
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		goType = "int32"
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		goType = "uint32"
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		goType = "int64"
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		goType = "uint64"
+	case protoreflect.FloatKind:
+		goType = "float32"
+	case protoreflect.DoubleKind:
+		goType = "float64"
+	case protoreflect.StringKind:
+		goType = "string"
+	case protoreflect.BytesKind:
+		goType = "[]byte"
+		pointer = false // rely on nullability of slices for presence
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		goType = "*" + g.QualifiedGoIdent(field.Message.GoIdent)
+		pointer = false // pointer captured as part of the type
+	}
+	switch {
+	case field.Desc.IsList():
+		return "[]" + goType, false
+	case field.Desc.IsMap():
+		keyType, _ := fieldGoType(g, f, field.Message.Fields[0])
+		valType, _ := fieldGoType(g, f, field.Message.Fields[1])
+		return fmt.Sprintf("map[%v]%v", keyType, valType), false
+	}
+	return goType, pointer
 }

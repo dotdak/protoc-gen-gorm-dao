@@ -1,9 +1,7 @@
 version: v1
-name: example
+name: buf.build/dotdak/protoc-gen-gorm-dao
 lint:
   use:
     - DEFAULT
 deps:
   - buf.build/googleapis/googleapis
-  - buf.build/envoyproxy/protoc-gen-validate
-  - buf.build/grpc-ecosystem/grpc-gateway
