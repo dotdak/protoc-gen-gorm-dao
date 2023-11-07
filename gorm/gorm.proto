@@ -6,6 +6,7 @@ import "google/protobuf/descriptor.proto";
 
 extend google.protobuf.MessageOptions {
   GormOptions opts = 2025;
+  GormRef ref = 2027;
 }
 
 message GormOptions {
@@ -24,4 +25,15 @@ message GormType {
     bool not_null = 4;
     bool unique_index = 5;
   }
+}
+
+message GormRef {
+  oneof ref {
+    BelongsTo belongs_to = 1;
+  }
+}
+
+message BelongsTo {
+  string key = 1;
+  string type = 2;
 }

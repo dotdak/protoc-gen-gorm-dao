@@ -6,9 +6,5 @@ managed:
     default: github.com/dotdak/protoc-gen-gorm-dao/gorm
 plugins:
   - name: go
-    out: examples/out
+    out: gorm
     opt: paths=source_relative
-  - name: gorm-dao
-    out: examples/out
-    opt: paths=source_relative
-    path: ./bin/protoc-gen-gorm-dao

@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 
+	"github.com/dotdak/protoc-gen-gorm-dao/gorm"
 	"github.com/dotdak/protoc-gen-gorm-dao/protoc-gen-gorm-dao/internal"
 	"google.golang.org/protobuf/compiler/protogen"
+	"google.golang.org/protobuf/proto"
 )
 
 func main() {
@@ -27,13 +29,21 @@ func main() {
 		ParamFunc:         flags.Set,
 		ImportRewriteFunc: importRewriteFunc,
 	}.Run(func(p *protogen.Plugin) error {
-
 		for _, f := range p.Files {
 			if !f.Generate || f.GoPackageName == "gorm" {
 				continue
 			}
 
-			_ = internal.GenerateFile(p, f)
+			shouldGenerate := false
+			for _, m := range f.Messages {
+				if opt, ok := proto.GetExtension(m.Desc.Options(), gorm.E_Opts).(*gorm.GormOptions); ok && opt != nil && opt.Orm {
+					shouldGenerate = true
+				}
+			}
+
+			if shouldGenerate {
+				_ = internal.GenerateFile(p, f)
+			}
 		}
 		return nil
 	})
