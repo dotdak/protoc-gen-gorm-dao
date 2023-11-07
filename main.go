@@ -4,7 +4,7 @@ import (
 	"flag"
 
 	"github.com/dotdak/protoc-gen-gorm-dao/gorm"
-	"github.com/dotdak/protoc-gen-gorm-dao/protoc-gen-gorm-dao/internal"
+	"github.com/dotdak/protoc-gen-gorm-dao/internal"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 )
