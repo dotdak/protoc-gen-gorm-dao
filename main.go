@@ -12,6 +12,7 @@ import (
 func main() {
 	var (
 		flags        flag.FlagSet
+		packageName  = flags.String("package", "", "specify package name of generated files")
 		importPrefix = flags.String("import_prefix", "", "prefix to prepend to import paths")
 	)
 	importRewriteFunc := func(importPath protogen.GoImportPath) protogen.GoImportPath {
@@ -42,7 +43,9 @@ func main() {
 			}
 
 			if shouldGenerate {
-				_ = internal.GenerateFile(p, f)
+				_ = internal.GenOption{
+					PackageName: internal.Coalesce(*packageName, string(f.GoPackageName)),
+				}.GenerateFile(p, f)
 			}
 		}
 		return nil

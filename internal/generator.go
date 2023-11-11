@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/dotdak/protoc-gen-gorm-dao/gorm"
 	"google.golang.org/protobuf/compiler/protogen"
@@ -9,13 +10,18 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-func GenerateFile(plugin *protogen.Plugin, file *protogen.File) *protogen.GeneratedFile {
+type GenOption struct {
+	PackageName string
+}
+
+func (opt GenOption) GenerateFile(plugin *protogen.Plugin, file *protogen.File) *protogen.GeneratedFile {
 	filename := file.GeneratedFilenamePrefix + ".dao.go"
 	g := plugin.NewGeneratedFile(filename, file.GoImportPath)
 	genGeneratedHeader(g, file)
 
-	g.P("package ", file.GoPackageName)
+	g.P("package ", opt.PackageName)
 	g.P()
+	log.Println(file.GeneratedFilenamePrefix)
 
 	genImportBase(g)
 	g.P()

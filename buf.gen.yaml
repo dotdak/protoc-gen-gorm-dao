@@ -3,12 +3,12 @@ managed:
   enabled: true
   optimize_for: CODE_SIZE
   go_package_prefix:
-    default: github.com/dotdak/protoc-gen-gorm-dao/gorm
+    default: github.com/dotdak/protoc-gen-gorm-dao
 plugins:
   - name: go
-    out: examples/out
+    out: examples/go_out
     opt: paths=source_relative
   - name: gorm-dao
-    out: examples/out
-    opt: paths=source_relative
+    out: examples/dao_out
+    opt: paths=import,module=github.com/dotdak/protoc-gen-gorm-dao/example_proto,package=dao_out
     path: ./bin/protoc-gen-gorm-dao
