@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/dotdak/protoc-gen-gorm-dao/gorm"
 	"google.golang.org/protobuf/compiler/protogen"
