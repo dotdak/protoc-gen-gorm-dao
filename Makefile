@@ -2,7 +2,7 @@
 
 build:
 	mkdir -p bin
-	go build -o protoc-gen-gorm-dao && mv protoc-gen-gorm-dao bin/
+	go build -o bin/protoc-gen-gorm-dao
 	buf generate --template bootstrap.yaml --exclude-path examples/example_proto
 	buf generate --exclude-path gorm/gorm.proto
 

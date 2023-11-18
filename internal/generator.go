@@ -21,7 +21,6 @@ func (opt GenOption) GenerateFile(plugin *protogen.Plugin, file *protogen.File) 
 
 	g.P("package ", opt.PackageName)
 	g.P()
-	log.Println(file.GeneratedFilenamePrefix)
 
 	genImportBase(g)
 	g.P()
@@ -70,9 +69,9 @@ func genMessage(g *protogen.GeneratedFile, f *protogen.File, m *protogen.Message
 	g.P("}")
 	g.P()
 
-	// g.P("func (d *", structName, ") TableName() string {")
-	// g.P("return \"", structName, "s\"")
-	// g.P("}")
+	g.P("func (d *", structName, ") TableName() string {")
+	g.P("return \"", structName, "\"")
+	g.P("}")
 
 	g.P("func (d *", structName, ") ToProto() *", m.GoIdent, " {")
 	g.P("pb := &", m.GoIdent, "{")
