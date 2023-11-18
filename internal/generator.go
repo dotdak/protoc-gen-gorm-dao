@@ -69,7 +69,7 @@ func genMessage(g *protogen.GeneratedFile, f *protogen.File, m *protogen.Message
 	g.P()
 
 	g.P("func (d *", structName, ") TableName() string {")
-	g.P("return \"", structName, "\"")
+	g.P("return \"", m.GoIdent, "\"")
 	g.P("}")
 
 	g.P("func (d *", structName, ") ToProto() *", m.GoIdent, " {")
